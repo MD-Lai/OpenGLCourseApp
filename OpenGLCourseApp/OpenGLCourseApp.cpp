@@ -1,6 +1,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <string.h>
+#include <cmath> 
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -10,6 +11,12 @@ const GLint WIDTH  = 800; // GLint is just an int type defined by opengl
 const GLint HEIGHT = 600;
 
 GLuint VAO, VBO, shader; // usually there are multiple vao, vbo for each object, so this is not good practice to global scope them
+GLuint uniformXMove;
+
+bool direction = true; // true is right
+float triOffset = 0.0f; // how much to move triangle, nothing to do with shader itself so not GLfloat or others
+float triMaxOffset = 0.7f; // limit before direction switch
+float triIncrement = 0.0005f; // how much to move each update
 
 // Vertex shader; usually done in external files
 // gl_Position is a built in variable
@@ -19,8 +26,9 @@ GLuint VAO, VBO, shader; // usually there are multiple vao, vbo for each object,
 static const char* vShader = " \n\
 #version 330 \n\
 layout (location = 0) in vec3 pos; \n\
+uniform float xMove; \n\
 void main(){ \n\
-    gl_Position = vec4(0.4*pos.x, 0.4*pos.y, 0.4*pos.z, 1.0); \n\
+    gl_Position = vec4(0.4*pos.x+xMove, 0.4*pos.y, 0.4*pos.z, 1.0); \n\
 }";
 
 // Fragment shader
@@ -108,6 +116,10 @@ void CompileShaders() {
         return;
     }
 
+    uniformXMove = glGetUniformLocation(shader, "xMove"); // shader program, name of variable we're looking for
+    // remember that the returned value is the location, or address, of the variable, hence GLuint rather than GLfloat
+
+
 }
 
 int main() {
@@ -169,7 +181,15 @@ int main() {
     while (!glfwWindowShouldClose(mainWindow)) {
         // Get & handle user input events
         glfwPollEvents();
-
+        if (direction) {
+            triOffset += triIncrement;
+        }
+        else {
+            triOffset -= triIncrement;
+        }
+        if (abs(triOffset) >= triMaxOffset) {
+            direction = !direction; 
+        }
         // clear window with a solid color (for starters this is all we'll do)
         // intent is to begin drawing on a clear window, so you don't draw over a frame (unless that's what you planned)
         //r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
@@ -180,6 +200,8 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT); // clear just color data of pixel (excluding things like depth, etc), other buffer bits exist
 
         glUseProgram(shader); // usually you would iterate through shaders 
+
+        glUniform1f(uniformXMove, triOffset); // set variable at location obtained in uniformXMove to triOffset 
 
         glBindVertexArray(VAO);
 
