@@ -6,6 +6,14 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+// GLM (make sure to install it)
+#include <glm/mat4x4.hpp> // as example of working import
+// be aware glm::mat4 model; no longer works
+// replace with glm::mat4 model(1.0f);
+// or glm::mat4 model = glm::mat4(1.0f)
+// and in subsequent re-inits like model = glm::mat(1.0f); evertime you initialise an identity matrix
+
+
 // window dimensions
 const GLint WIDTH  = 800; // GLint is just an int type defined by opengl
 const GLint HEIGHT = 600;
