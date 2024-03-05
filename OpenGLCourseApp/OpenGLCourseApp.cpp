@@ -7,19 +7,22 @@
 #include <GLFW/glfw3.h>
 
 // GLM (make sure to install it)
-#include <glm/mat4x4.hpp> // as example of working import
+// #include <glm/mat4x4.hpp> // as example of working import
 // be aware glm::mat4 model; no longer works
 // replace with glm::mat4 model(1.0f);
 // or glm::mat4 model = glm::mat4(1.0f)
 // and in subsequent re-inits like model = glm::mat(1.0f); evertime you initialise an identity matrix
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 // window dimensions
 const GLint WIDTH  = 800; // GLint is just an int type defined by opengl
 const GLint HEIGHT = 600;
 
 GLuint VAO, VBO, shader; // usually there are multiple vao, vbo for each object, so this is not good practice to global scope them
-GLuint uniformXMove;
+GLuint uniformModel;
 
 bool direction = true; // true is right
 float triOffset = 0.0f; // how much to move triangle, nothing to do with shader itself so not GLfloat or others
@@ -34,9 +37,9 @@ float triIncrement = 0.0005f; // how much to move each update
 static const char* vShader = " \n\
 #version 330 \n\
 layout (location = 0) in vec3 pos; \n\
-uniform float xMove; \n\
+uniform mat4 model; \n\
 void main(){ \n\
-    gl_Position = vec4(0.4*pos.x+xMove, 0.4*pos.y, 0.4*pos.z, 1.0); \n\
+    gl_Position = model * vec4(0.4*pos.x, 0.4*pos.y, pos.z, 1.0); \n\
 }";
 
 // Fragment shader
@@ -124,10 +127,8 @@ void CompileShaders() {
         return;
     }
 
-    uniformXMove = glGetUniformLocation(shader, "xMove"); // shader program, name of variable we're looking for
+    uniformModel = glGetUniformLocation(shader, "model"); // shader program, name of variable we're looking for
     // remember that the returned value is the location, or address, of the variable, hence GLuint rather than GLfloat
-
-
 }
 
 int main() {
@@ -209,12 +210,14 @@ int main() {
 
         glUseProgram(shader); // usually you would iterate through shaders 
 
-        glUniform1f(uniformXMove, triOffset); // set variable at location obtained in uniformXMove to triOffset 
+        glm::mat4 model = glm::mat4(1.0f); // doesn't automattical init as identity, make sure to init it properly
+        model = glm::translate(model, glm::vec3(triOffset, 0.0f, 0.0f));
+
+        //glUniform1f(uniformXMove, triOffset); // set variable at location obtained in uniformXMove to triOffset 
+        glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
 
         glBindVertexArray(VAO);
-
-        glDrawArrays(GL_TRIANGLES, 0, 3); // normally you would store the number of points in the object, or if you were to store multiple objects you would edit the offset etc.
-
+        glDrawArrays(GL_TRIANGLES, 0, 3); // normally you would store the number of points in the object, or if you were to store multiple objects you would edit the offset etc
         glBindVertexArray(0);
 
         glUseProgram(0);
