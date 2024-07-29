@@ -21,13 +21,22 @@
 const GLint WIDTH  = 800; // GLint is just an int type defined by opengl
 const GLint HEIGHT = 600;
 
-GLuint VAO, VBO, shader; // usually there are multiple vao, vbo for each object, so this is not good practice to global scope them
+const float toRadians = 3.14159265f / 180.0f;
+
+GLuint VAO, VBO, IBO, shader; // usually there are multiple vao, vbo for each object, so this is not good practice to global scope them
 GLuint uniformModel;
 
 bool direction = true; // true is right
 float triOffset = 0.0f; // how much to move triangle, nothing to do with shader itself so not GLfloat or others
 float triMaxOffset = 0.7f; // limit before direction switch
 float triIncrement = 0.0005f; // how much to move each update
+
+float curAngle = 0.0f;
+
+bool sizeDirection = true;
+float curSize = 0.4f;
+float maxSize = 0.8f;
+float minSize = 0.1f;
 
 // Vertex shader; usually done in external files
 // gl_Position is a built in variable
@@ -37,9 +46,11 @@ float triIncrement = 0.0005f; // how much to move each update
 static const char* vShader = " \n\
 #version 330 \n\
 layout (location = 0) in vec3 pos; \n\
+out vec4 vCol;\n\
 uniform mat4 model; \n\
 void main(){ \n\
-    gl_Position = model * vec4(0.4*pos.x, 0.4*pos.y, pos.z, 1.0); \n\
+    gl_Position = model * vec4(pos, 1.0); \n\
+    vCol = vec4(clamp(pos, 0.0f, 1.0f), 1.0f); \n\
 }";
 
 // Fragment shader
@@ -47,18 +58,33 @@ void main(){ \n\
 static const char* fShader = " \n\
 #version 330 \n\
 out vec4 colour; \n\
+in vec4 vCol; \n\
 void main(){ \n\
-    colour = vec4(1.0, 0, 1.0, 1.0); \n\
+    colour = vCol; \n\
 }";
 
 void CreateTriangle() {
+    // define the indices of the points that compose each triangle
+    unsigned int indices[] = {
+        0,3,1,
+        1,3,2,
+        2,3,0,
+        0,1,2
+    };
+    // define the points of the triangle/shape
     GLfloat vertices[] = {
         -1.0f, -1.0f, 0.0f,
+         0.0f, -1.0f, 1.0f,
          1.0f, -1.0f, 0.0f,
          0.0f,  1.0f, 0.0f
     };
+
     glGenVertexArrays(1, &VAO); // create (potentially multiple) VAOs using given address 
     glBindVertexArray(VAO); // tell opengl we are now working on THIS VAO 
+
+    glGenBuffers(1, &IBO); 
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO); // element buffer is a buffer of indices aka elements (sometimes IBO = EBO) 
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW); // this is just boilerplate stuff
 
     // some people like to indent here to indicate that this context is using the VAO bound above 
     glGenBuffers(1, &VBO);
@@ -74,6 +100,7 @@ void CreateTriangle() {
 
     glBindVertexArray(0);
 
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
 void AddShader(GLuint theProgram, const char* shaderCode, GLenum shaderType) {
@@ -179,13 +206,15 @@ int main() {
         return 1;
     }
 
+    glEnable(GL_DEPTH_TEST); // otherwise depth testing is disabled and triangles get drawn without depth (drawn over each other)
+
     // setup viewport size
     glViewport(0, 0, bufferWidth, bufferHeight);
     
     CreateTriangle();
     CompileShaders();
 
-    float r=0.0f, g=1.0f, b=0.0f;
+    float r=0.0f, g=0.0f, b=0.0f;
     // loop until window closed (equiv to update loop?)
     while (!glfwWindowShouldClose(mainWindow)) {
         // Get & handle user input events
@@ -199,25 +228,42 @@ int main() {
         if (abs(triOffset) >= triMaxOffset) {
             direction = !direction; 
         }
+        if (sizeDirection) {
+            curSize += 0.001f;
+        }
+        else {
+            curSize -= 0.001f;
+        }
+        if (curSize >= maxSize || curSize <= minSize) {
+            sizeDirection = !sizeDirection;
+        }
         // clear window with a solid color (for starters this is all we'll do)
         // intent is to begin drawing on a clear window, so you don't draw over a frame (unless that's what you planned)
         //r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         //g = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         //b = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 
+        curAngle = fmod(curAngle + 0.01f, 360.0f);
+
         glClearColor(r, g, b, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT); // clear just color data of pixel (excluding things like depth, etc), other buffer bits exist
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear just color data of pixel (excluding things like depth, etc), other buffer bits exist
 
         glUseProgram(shader); // usually you would iterate through shaders 
 
         glm::mat4 model = glm::mat4(1.0f); // doesn't automattical init as identity, make sure to init it properly
-        model = glm::translate(model, glm::vec3(triOffset, 0.0f, 0.0f));
+        // model = glm::translate(model, glm::vec3(triOffset, 0.0f, 0.0f)); 
+        model = glm::rotate(model, curAngle * toRadians, glm::vec3(0.0f, 1.0f, 0)); // rotation axis
+        // remember that the model has its own axes defined in the model matrix, which is why translate doesn't only move it left and right relative to the screen
+        model = glm::scale(model, glm::vec3(0.4f, 0.4f, 1.0f));
+        // without a projection matrix, everything is calculated relative to the screen size
 
         //glUniform1f(uniformXMove, triOffset); // set variable at location obtained in uniformXMove to triOffset 
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
 
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3); // normally you would store the number of points in the object, or if you were to store multiple objects you would edit the offset etc
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+        glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, 0); // for indexed draws, this is what you call to draw it. 
+        // glDrawArrays(GL_TRIANGLES, 0, 3); // normally you would store the number of points in the object, or if you were to store multiple objects you would edit the offset etc
         glBindVertexArray(0);
 
         glUseProgram(0);
