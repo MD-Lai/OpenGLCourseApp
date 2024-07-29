@@ -25,6 +25,7 @@ const float toRadians = 3.14159265f / 180.0f;
 
 GLuint VAO, VBO, IBO, shader; // usually there are multiple vao, vbo for each object, so this is not good practice to global scope them
 GLuint uniformModel;
+GLuint uniformProjection;
 
 bool direction = true; // true is right
 float triOffset = 0.0f; // how much to move triangle, nothing to do with shader itself so not GLfloat or others
@@ -48,8 +49,9 @@ static const char* vShader = " \n\
 layout (location = 0) in vec3 pos; \n\
 out vec4 vCol;\n\
 uniform mat4 model; \n\
+uniform mat4 projection; \n\
 void main(){ \n\
-    gl_Position = model * vec4(pos, 1.0); \n\
+    gl_Position = projection * model * vec4(pos, 1.0); \n\
     vCol = vec4(clamp(pos, 0.0f, 1.0f), 1.0f); \n\
 }";
 
@@ -155,6 +157,7 @@ void CompileShaders() {
     }
 
     uniformModel = glGetUniformLocation(shader, "model"); // shader program, name of variable we're looking for
+    uniformProjection = glGetUniformLocation(shader, "projection"); // shader program, name of variable we're looking for
     // remember that the returned value is the location, or address, of the variable, hence GLuint rather than GLfloat
 }
 
@@ -214,6 +217,8 @@ int main() {
     CreateTriangle();
     CompileShaders();
 
+    glm::mat4 projection = glm::perspective(45.0f, (GLfloat)bufferWidth / (GLfloat)bufferHeight, 0.01f, 10.0f);
+
     float r=0.0f, g=0.0f, b=0.0f;
     // loop until window closed (equiv to update loop?)
     while (!glfwWindowShouldClose(mainWindow)) {
@@ -251,7 +256,7 @@ int main() {
         glUseProgram(shader); // usually you would iterate through shaders 
 
         glm::mat4 model = glm::mat4(1.0f); // doesn't automattical init as identity, make sure to init it properly
-        // model = glm::translate(model, glm::vec3(triOffset, 0.0f, 0.0f)); 
+        model = glm::translate(model, glm::vec3(0.0f, triOffset, -2.5f)); 
         model = glm::rotate(model, curAngle * toRadians, glm::vec3(0.0f, 1.0f, 0)); // rotation axis
         // remember that the model has its own axes defined in the model matrix, which is why translate doesn't only move it left and right relative to the screen
         model = glm::scale(model, glm::vec3(0.4f, 0.4f, 1.0f));
@@ -259,6 +264,7 @@ int main() {
 
         //glUniform1f(uniformXMove, triOffset); // set variable at location obtained in uniformXMove to triOffset 
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix4fv(uniformProjection, 1, GL_FALSE, glm::value_ptr(projection));
 
         glBindVertexArray(VAO);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
