@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <cmath> 
+#include <vector>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -17,11 +18,15 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "Mesh.h"
+
 // window dimensions
 const GLint WIDTH  = 800; // GLint is just an int type defined by opengl
 const GLint HEIGHT = 600;
 
 const float toRadians = 3.14159265f / 180.0f;
+
+std::vector<Mesh*> meshList;
 
 GLuint VAO, VBO, IBO, shader; // usually there are multiple vao, vbo for each object, so this is not good practice to global scope them
 GLuint uniformModel;
@@ -81,28 +86,13 @@ void CreateTriangle() {
          0.0f,  1.0f, 0.0f
     };
 
-    glGenVertexArrays(1, &VAO); // create (potentially multiple) VAOs using given address 
-    glBindVertexArray(VAO); // tell opengl we are now working on THIS VAO 
+    Mesh* obj1 = new Mesh();
+    obj1->CreateMesh(vertices, indices, 12, 12); // just watch magic numbers for later. In the end the num will be provided in files so we don't need to calculate it
+    meshList.push_back(obj1);
 
-    glGenBuffers(1, &IBO); 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO); // element buffer is a buffer of indices aka elements (sometimes IBO = EBO) 
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW); // this is just boilerplate stuff
-
-    // some people like to indent here to indicate that this context is using the VAO bound above 
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO); // insert the buffer into the bound VAO
-
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW); // sizeof vertices is ok in this instance, but it's not a great practice due to sizeof not being entirely comprehensive
-    // can use GL_DYNAMIC_DRAW but it's more complicated to use, and in most programs we will just use GL_STATIC_DRAW
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0); // basically indicates the drawing loop parameters, data size, number of points etc. refer to variable names
-    glEnableVertexAttribArray(0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0); // unbind buffers in reverse order of binding them by binding them to 0
-
-    glBindVertexArray(0);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    Mesh* obj2 = new Mesh();
+    obj2->CreateMesh(vertices, indices, 12, 12); // just watch magic numbers for later. In the end the num will be provided in files so we don't need to calculate it
+    meshList.push_back(obj2);
 }
 
 void AddShader(GLuint theProgram, const char* shaderCode, GLenum shaderType) {
@@ -256,8 +246,9 @@ int main() {
         glUseProgram(shader); // usually you would iterate through shaders 
 
         glm::mat4 model = glm::mat4(1.0f); // doesn't automattical init as identity, make sure to init it properly
+
         model = glm::translate(model, glm::vec3(0.0f, triOffset, -2.5f)); 
-        model = glm::rotate(model, curAngle * toRadians, glm::vec3(0.0f, 1.0f, 0)); // rotation axis
+        //model = glm::rotate(model, curAngle * toRadians, glm::vec3(0.0f, 1.0f, 0)); // rotation axis
         // remember that the model has its own axes defined in the model matrix, which is why translate doesn't only move it left and right relative to the screen
         model = glm::scale(model, glm::vec3(0.4f, 0.4f, 1.0f));
         // without a projection matrix, everything is calculated relative to the screen size
@@ -266,11 +257,13 @@ int main() {
         glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
         glUniformMatrix4fv(uniformProjection, 1, GL_FALSE, glm::value_ptr(projection));
 
-        glBindVertexArray(VAO);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
-        glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, 0); // for indexed draws, this is what you call to draw it. 
-        // glDrawArrays(GL_TRIANGLES, 0, 3); // normally you would store the number of points in the object, or if you were to store multiple objects you would edit the offset etc
-        glBindVertexArray(0);
+        meshList[0]->RenderMesh();
+        
+        model = glm::mat4(1.0f); // remember 1.0f is required to initialise to not junk values.
+        model = glm::translate(model, glm::vec3(-triOffset, 0.0f, -2.5f));
+        model = glm::scale(model, glm::vec3(0.4f, 0.4f, 1.0f));
+        glUniformMatrix4fv(uniformModel, 1, GL_FALSE, glm::value_ptr(model));
+        meshList[1]->RenderMesh();
 
         glUseProgram(0);
 
